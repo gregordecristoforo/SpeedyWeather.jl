@@ -679,9 +679,12 @@ end
     ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
 
     # Amplitudes with height. NOTE: cos(ηᵥ)^(3//2) would pull a Float64 log2/exp2 into the
-    # kernel (see JablonowskiVorticity above), so reuse the sqrt that A1 already needs
+    # kernel (see JablonowskiVorticity above), so reuse the sqrt that A1 already needs.
+    # @fastmath: cosηᵥ >= 0 by construction (ηᵥ ∈ [-η₀, 1-η₀] * π/2 stays within [-π/2, π/2]),
+    # so sqrt(cosηᵥ) is always in-domain, but the compiler can't prove that and keeps the
+    # DomainError throw path (see the matching comment in JablonowskiVorticity above).
     cosηᵥ = cos(ηᵥ)
-    sqrt_cosηᵥ = sqrt(cosηᵥ)
+    sqrt_cosηᵥ = @fastmath sqrt(cosηᵥ)
     A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt_cosηᵥ
     A2 = 2u₀ * cosηᵥ * sqrt_cosηᵥ
 
