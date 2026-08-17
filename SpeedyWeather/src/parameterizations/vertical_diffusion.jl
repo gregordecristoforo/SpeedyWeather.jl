@@ -191,7 +191,10 @@ end
         Ri_N = Ri[ij, nlayers]                      # surface bulk Richardson number
         Ri_N = clamp(Ri_N, 0, Ri_c)                 # cases of eq. 12-14
         sqrtC = (κ / logZ_z₀) * (1 - Ri_N / Ri_c)           # sqrt of eq. 12-14
-        surface_speed = sqrt(u[ij, nlayers]^2 + v[ij, nlayers]^2)
+        # @fastmath: u^2 + v^2 is provably >= 0 for any finite u, v (sum of squares), so sqrt is
+        # always in-domain, but the compiler can't prove that statically and keeps the DomainError
+        # throw path — this is what shows up on AMDGPU as a "Global hostcalls detected" warning.
+        surface_speed = @fastmath sqrt(u[ij, nlayers]^2 + v[ij, nlayers]^2)
         K0 = κ * surface_speed * sqrtC              # height-independent K eq. 19, 20
 
         for k in kₕ:nlayers

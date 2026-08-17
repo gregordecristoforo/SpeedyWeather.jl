@@ -178,7 +178,12 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
     # 0 < z < z₀ doesn't make sense so cap here
     z = max(z, 10z₀)
-    drag_max = (κ / log(z / z₀))^2
+    # @fastmath: z >= 10z₀ >= 0 and z₀ >= 0 (roughness_length bounds = Nonnegative), so z/z₀ is
+    # never negative (it's ≥ 10, or 0/0 = NaN, or finite/0 = Inf, but never < 0), meaning log's
+    # DomainError (thrown only for negative arguments) is provably unreachable — but the compiler
+    # can't prove that statically and keeps the throw path, which is what shows up on AMDGPU as a
+    # "Global hostcalls detected" warning.
+    drag_max = @fastmath (κ / log(z / z₀))^2
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here

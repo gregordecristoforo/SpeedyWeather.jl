@@ -38,7 +38,10 @@ end
     vₛ = wind_slowdown * v_grid[ij, nlayers]
 
     # Fortran SPEEDY documentation eq. 50, sqrt(u² + v² + gust_speed²)
-    surface_wind_speed = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust_speed^2)))
+    # @fastmath: a sum of squares is provably >= 0 for any finite input, so sqrt is always
+    # in-domain, but the compiler can't prove that statically and keeps the DomainError throw
+    # path — this is what shows up on AMDGPU as a "Global hostcalls detected" warning.
+    surface_wind_speed = @fastmath sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust_speed^2)))
     vars.parameterizations.surface_wind_speed[ij] = surface_wind_speed
 
     # Surface air density
@@ -52,7 +55,11 @@ end
     q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
         get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)
     Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
-    σ⁻ᵏ = σ^(-κ)                                    # precalculate
+    # @fastmath: σ (a pressure ratio p/pₛ) is provably > 0 by construction of the sigma coordinate
+    # system, so the base of this fractional power is always positive and in-domain, but the
+    # compiler can't prove that statically and keeps the DomainError throw path — this is what
+    # shows up on AMDGPU as a "Global hostcalls detected" warning.
+    σ⁻ᵏ = @fastmath σ^(-κ)                          # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
     ρ = pₛ / (R_dry * Tᵥ)                           # surface air density [kg/m³] from ideal gas law
     surface_air_density[ij] = ρ                     # store for surface temp/humidity fluxes

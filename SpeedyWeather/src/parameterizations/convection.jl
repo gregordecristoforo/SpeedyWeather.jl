@@ -210,7 +210,12 @@ set to NaN instead and should be skipped in the relaxation."""
 
         if !saturated                       # if not saturated yet follow dry adiabat
             # dry adiabatic ascent and saturation humidity of that temperature
-            temp_parcel_dry = temp_parcel * (σ[k] / σ[k + 1])^κ
+            # @fastmath: σ levels are provably > 0 by construction of the sigma coordinate system
+            # (relied upon elsewhere too, e.g. geopotential.jl's log(σ_half/σ_full)), so the base
+            # of this fractional power is always positive and in-domain, but the compiler can't
+            # prove that statically and keeps the DomainError throw path — this is what shows up
+            # on AMDGPU as a "Global hostcalls detected" warning.
+            temp_parcel_dry = temp_parcel * @fastmath (σ[k] / σ[k + 1])^κ
             sat_humid = saturation_humidity(temp_parcel_dry, σ[k] * pres, atmosphere)
 
             # set to saturated when the dry adiabatic ascent would reach saturation

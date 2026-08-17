@@ -104,7 +104,11 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     # Zenith angle correction factor
     azen = transmissivity.zenith_amplitude
     nzen = transmissivity.zenith_exponent
-    zenith_factor = 1 + azen * (1 - cos_zenith)^nzen
+    # @fastmath: cos_zenith is a physical cosine of the solar zenith angle and thus provably <= 1,
+    # so 1 - cos_zenith is always >= 0, making this fractional power's base always in-domain, but
+    # the compiler can't prove that statically and keeps the DomainError throw path — this is what
+    # shows up on AMDGPU as a "Global hostcalls detected" warning.
+    zenith_factor = 1 + azen * @fastmath (1 - cos_zenith)^nzen
 
     # Cloud absorption term based on cloud base humidity (SPEEDY logic)
     q_base = nlayers > 1 ? humid[ij, nlayers - 1] : humid[ij, nlayers]

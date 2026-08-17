@@ -115,7 +115,13 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     # Precipitation contribution (rain rate is in m/s)
     rain_rate = vars.parameterizations.rain_rate[ij]
     precip_term = min(precip_max, (86400 * rain_rate) / 1000)   # convert to mm/day
-    P = precip_weight * sqrt(precip_term)
+    # @fastmath: rain_rate is provably >= 0 here (reset to 0 in reset_variables! then only
+    # accumulated from non-negative contributions in large_scale_condensation!/convection!, both
+    # of which run before this in the parameterization order) and precip_max > 0, so precip_term
+    # is always >= 0 and sqrt is in-domain, but the compiler can't prove that statically and keeps
+    # the DomainError throw path — this is what shows up on AMDGPU as a "Global hostcalls detected"
+    # warning.
+    P = precip_weight * @fastmath sqrt(precip_term)
 
     # from convection or large-scale condensation
     cloud_top_precipitation = vars.parameterizations.cloud_top[ij]       
